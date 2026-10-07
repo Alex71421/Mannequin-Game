@@ -64,21 +64,25 @@ public:
 
 private:
 	TArray<ECellType> Cells;
-
-	// Крупная сетка: для каждого блока true — входит в фигуру, false — нет.
-	// Хранится так же одной строкой, как Cells
 	TArray<bool> Blocks;
 
 	// Переводит координаты (X, Y) в номер элемента массива.
-	// const в конце — функция только читает данные и ничего не меняет.
 	int32 GetIndex(int32 X, int32 Y) const;
 
 	// То же, что GetIndex, только для крупной сетки:
-	// переводит координаты блока (BX, BY) в номер в массиве Blocks
 	int32 GetBlockIndex(int32 BX, int32 BY) const;
 
 	// FRandomStream — генератор случайных чисел Unreal.
 	// Хранит своё зерно и выдаёт из него цепочку чисел.
-	// Без UPROPERTY: в редакторе его показывать не нужно
 	FRandomStream Rng;
+
+	// Возвращает координаты соседнего блока в направлении Dir:
+	// 0 — вверх, 1 — вправо, 2 — вниз, 3 — влево
+	FIntPoint GetNeighbor(FIntPoint Point, int32 Dir) const;
+
+	// true, если блок с такими координатами есть в крупной сетке
+	bool IsBlockInBounds(FIntPoint Point) const;
+
+	// true, если в фигуре есть замкнутая пустота
+	bool HasHoles() const;
 };

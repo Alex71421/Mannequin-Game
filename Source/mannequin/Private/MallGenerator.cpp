@@ -75,7 +75,7 @@ void AMallGenerator::Generate()
 	// FMath::Max(a, b) возвращает большее из двух
 	const int32 TargetBlocks = FMath::Max(1, FMath::RoundToInt(ShapeBlocksX * ShapeBlocksY * ShapeFill));
 
-	// FIntPoint — структура Unreal из двух целых чисел X и Y,
+
 	TArray<FIntPoint> Filled;
 	Filled.Add(FIntPoint(StartX, StartY));
 	int32 Attempts = 0;
@@ -83,38 +83,27 @@ void AMallGenerator::Generate()
 	while (Filled.Num() < TargetBlocks && Attempts < 1000) {
 		++Attempts;
 
-		// Берём из массива случайный блок фигуры
+		// Берём из массива случайный блок фигуры и случайного соседа
 		const FIntPoint From = Filled[Rng.RandRange(0, Filled.Num() - 1)];
-		const int32 Dir = Rng.RandRange(0, 3);
-
-		FIntPoint Next = From;
-		switch (Dir) {
-		case 0 :
-			Next.Y += 1;
-			break;
-		case 1:
-			Next.X += 1;
-			break;
-		case 2:
-			Next.Y -= 1;
-			break;
-		case 3:
-			Next.X -= 1;
-			break;
-		}
-
-		// Проверяем, что сосед не вышел за пределы крупной сетки.
-		if (Next.X < 0 || Next.Y < 0 || Next.X >= ShapeBlocksX || Next.Y >= ShapeBlocksY) {
+		FIntPoint Next = GetNeighbor(From, Rng.RandRange(0, 3));
+		
+		if (!IsBlockInBounds(Next)) {
 			continue;
 		}
 
-		// Если сосед уже входит в фигуру, пристраивать нечего
-		if (Blocks[GetBlockIndex(Next.X, Next.Y)])
-		{
+		const int32 NextIndex = GetBlockIndex(Next.X, Next.Y);
+
+		if (Blocks[NextIndex]) {
 			continue;
 		}
 
-		Blocks[GetBlockIndex(Next.X, Next.Y)] = true;
+		Blocks[NextIndex] = true;
+
+		if (HasHoles()) {
+			Blocks[NextIndex] = false;
+			continue;
+		}
+
 		Filled.Add(Next);
 	}
 
@@ -139,4 +128,84 @@ int32 AMallGenerator::GetIndex(int32 X, int32 Y) const
 
 int32 AMallGenerator::GetBlockIndex(int32 BX, int32 BY) const {
 	return BY * ShapeBlocksX + BX;
+}
+
+FIntPoint AMallGenerator::GetNeighbor(FIntPoint Point, int32 Dir) const {
+	FIntPoint Result = Point;
+	switch (Dir)
+	{
+	case 0:
+		Result.Y += 1;
+		break;
+	case 1:
+		Result.X += 1;
+		break;
+	case 2:
+		Result.Y -= 1;
+		break;
+	default:
+		Result.X -= 1;
+		break;
+	}
+	return Result;
+}
+
+bool AMallGenerator::IsBlockInBounds(FIntPoint Point) const {
+	return Point.X >= 0 && Point.Y >= 0 && Point.X < ShapeBlocksX && Point.Y < ShapeBlocksY;
+}
+
+bool  AMallGenerator::HasHoles() const {
+	// Для каждого блока: дошла ли до него вода. Сначала везде false — «сухо»
+	TArray<bool> Visited;
+	Visited.Init(false, ShapeBlocksX * ShapeBlocksY);
+
+	// Очередь блоков, из которых вода ещё будет растекаться
+	TArray<FIntPoint> Queue;
+
+	// 1. Наливаем воду во все пустые блоки по краю сетки
+	for (int32 BY = 0; BY < ShapeBlocksY; ++BY) {
+		for (int32 BX = 0; BX < ShapeBlocksX; ++BX) {
+			// Блок на краю, если он в первом или последнем столбце или ряду
+			const bool bOnEdge = BX == 0 || BY == 0 || BX == ShapeBlocksX - 1 || BY == ShapeBlocksY - 1;
+			const int32 Index = GetBlockIndex(BX, BY);
+
+			if (bOnEdge && !Blocks[Index]) {
+				Visited[Index] = true;
+				Queue.Add(FIntPoint(BX, BY));
+			}
+		}
+	}
+
+	// 2. Растекаемся. Берём блоки из очереди по порядку и заливаем их пустых соседей.
+	for (int32 i = 0; i < Queue.Num(); ++i) {
+		const FIntPoint Current = Queue[i];
+
+		// Проверяем всех четырёх соседей
+		for (int32 Dir = 0; Dir < 4; ++Dir) {
+			const FIntPoint Next = GetNeighbor(Current, Dir);
+
+			if (!IsBlockInBounds(Next)) {
+				continue;
+			}
+
+			const int32 NextIndex = GetBlockIndex(Next.X, Next.Y);
+			// Сквозь здание вода не течёт, а уже залитый блок второй раз не заливаем
+			if (Blocks[NextIndex] || Visited[NextIndex]) {
+				continue;
+			}
+
+			Visited[NextIndex] = true;
+			Queue.Add(Next);
+		}
+	}
+
+	// 3. Ищем пустой блок, до которого вода не дошла.
+	for (int32 i = 0; i < Blocks.Num(); ++i) {
+		// Если блок не посещался и блок не здание
+		if (!Visited[i] && !Blocks[i]) {
+			return true;
+		}
+	}
+
+	return false;
 }
