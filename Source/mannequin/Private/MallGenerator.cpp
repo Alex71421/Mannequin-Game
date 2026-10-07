@@ -1,10 +1,25 @@
 #include "MallGenerator.h"
 #include "DrawDebugHelpers.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "UObject/ConstructorHelpers.h"
 
 AMallGenerator::AMallGenerator()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+
+	// Создаём компонент пола
+	// SetupAttachment(родитель) прикрепляет компонент к корню: пол будет
+	// двигаться вместе с генератором
+	FloorMesh = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Floor"));
+	FloorMesh->SetupAttachment(RootComponent);
+
+	// FObjectFinder<Тип>(путь) ищет ассет в проекте по пути.
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
+	if (CubeMesh.Succeeded()) {
+		FloorMesh->SetStaticMesh(CubeMesh.Object);
+	}
 }
 
 void AMallGenerator::DrawGrid()
@@ -147,7 +162,9 @@ void AMallGenerator::Generate()
 		}
 	}
 
+	BuildFloor();
 	DrawGrid();
+	
 }
 
 int32 AMallGenerator::GetIndex(int32 X, int32 Y) const
@@ -268,4 +285,32 @@ int32 AMallGenerator::GetDistanceToEdge(int32 X, int32 Y, int32 MaxDistance) con
 
 	// Ни в одном квадрате улицы не нашлось: клетка глубоко внутри
 	return MaxDistance + 1;
+}
+
+void AMallGenerator::BuildFloor()
+{
+	FloorMesh->ClearInstances();
+
+	// Масштаб плитки. Куб имеет размер 100 см, поэтому масштаб CellSize / 100
+	// растягивает его на всю клетку: 400 / 100 = 4, то есть 4 метра.
+	const FVector Scale(CellSize / 100.0f, CellSize / 100.0f, FloorThickness / 100.f);
+
+	for (int32 Y = 0; Y < GridHeight; ++Y) {
+		for (int32 X = 0; X < GridWidth; ++X) {
+			if (Cells[GetIndex(X, Y)] != ECellType::Corridor) {
+				continue;
+			}
+
+			const FVector Location((X + 0.5f) * CellSize, (Y + 0.5f) * CellSize, -FloorThickness * 0.5f);
+			FloorMesh->AddInstance(FTransform(FRotator::ZeroRotator, Location, Scale));
+		}
+	}
+}
+
+void AMallGenerator::BeginPlay() {
+	Super::BeginPlay();
+
+	if (bGenerateOnBeginPlay) {
+		Generate();
+	}
 }
