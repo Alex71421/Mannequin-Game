@@ -37,13 +37,20 @@ void AMallGenerator::DrawGrid()
 			// Берём тип клетки из массива
 			const ECellType Type = Cells[GetIndex(X, Y)];
 
-			// Тернарный оператор: условие ? если_да : если_нет.
-			FColor Color = FColor(80, 80, 80);
+			FColor Color;
 
-			// Если клетка — коридор, меняем цвет на синий
-			if (Type == ECellType::Corridor)
-			{
+			switch (Type) {
+			case ECellType::Outside:
+				continue;
+			case ECellType::Empty:
+				Color = FColor(80, 80, 80);
+				break;
+			case ECellType::ShopZone:
+				Color = FColor::Yellow;
+				break;
+			case ECellType::Corridor:
 				Color = FColor::Blue;
+				break;
 			}
 
 			DrawDebugBox(World, Center, HalfSize, Color, true);
@@ -56,7 +63,7 @@ void AMallGenerator::Generate()
 	GridWidth = ShapeBlocksX * BlockSize;
 	GridHeight = ShapeBlocksY * BlockSize;
 
-	Cells.Init(ECellType::Empty, GridWidth * GridHeight);
+	Cells.Init(ECellType::Outside, GridWidth * GridHeight);
 
 	if (bRandomSeed) {
 		Seed = FMath::Rand();
@@ -113,7 +120,29 @@ void AMallGenerator::Generate()
 			const int32 BY = Y / BlockSize;
 
 			if (Blocks[GetBlockIndex(BX, BY)]) {
-				Cells[GetIndex(X, Y)] = ECellType::Corridor;
+				// Клетка входит в здание. Пока помечаем её как внутреннюю часть,
+				Cells[GetIndex(X, Y)] = ECellType::Empty;
+			}
+		}
+	}
+
+	const int32 MaxDistance = ShopStripWidth + CorridorWidth;
+
+	for (int32 Y = 0; Y < GridHeight; ++Y) {
+		for (int32 X = 0; X < GridWidth; ++X) {
+			const int32 Index = GetIndex(X, Y);
+
+			// Улицу не трогаем, обрабатываем только клетки здания
+			if (Cells[Index] != ECellType::Empty) {
+				continue;
+			}
+
+			const int32 Distance = GetDistanceToEdge(X, Y, MaxDistance);
+			if (Distance <= ShopStripWidth) {
+				Cells[Index] = ECellType::ShopZone;
+			}
+			else if (Distance <= MaxDistance) {
+				Cells[Index] = ECellType::Corridor;
 			}
 		}
 	}
@@ -208,4 +237,35 @@ bool  AMallGenerator::HasHoles() const {
 	}
 
 	return false;
+}
+
+bool AMallGenerator::IsCellInBounds(int32 X, int32 Y) const {
+	return X >= 0 && Y >= 0 && X < GridWidth && Y < GridHeight;
+}
+
+int32 AMallGenerator::GetDistanceToEdge(int32 X, int32 Y, int32 MaxDistance) const {
+	// Увеличиваем радиус квадрата: 1, 2, 3 ... MaxDistance
+	for (int32 Radius = 1; Radius <= MaxDistance; ++Radius) {
+		// DX и DY — сдвиг от клетки (X, Y) внутри квадрата.
+		for (int32 DY = -Radius; DY <= Radius; ++DY) {
+			for (int32 DX = -Radius; DX <= Radius; ++DX) {
+				// Координаты проверяемой клетки внутри квадрата
+				const int32 CheckX = X + DX;
+				const int32 CheckY = Y + DY;
+
+				// За пределами сетки — это улица, значит край найден
+				if (!IsCellInBounds(CheckX, CheckY))
+				{
+					return Radius;
+				}
+
+				if (Cells[GetIndex(CheckX, CheckY)] == ECellType::Outside) {
+					return Radius;
+				}
+			}
+		}
+	}
+
+	// Ни в одном квадрате улицы не нашлось: клетка глубоко внутри
+	return MaxDistance + 1;
 }

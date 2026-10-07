@@ -11,7 +11,9 @@
 UENUM()
 enum class ECellType : uint8
 {
-	Empty,     // пустота
+	Outside,   // вне здания
+	Empty,     // внутри здания, пока пусто
+	ShopZone,  // Полоса у края, будущие магазины и глухие стены
 	Corridor   // коридор
 };
 
@@ -49,12 +51,20 @@ public:
 
 	// Сторона одного блока в клетках мелкой сетки (8 клеток × 4 м = 32 м)
 	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "1"))
-	int32 BlockSize = 8;
+	int32 BlockSize = 12;
 
 	// Какую долю крупной сетки заполнить: 0.6 = 60% блоков.
 	// ClampMin и ClampMax не дают ввести значение меньше 0 или больше 1
 	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float ShapeFill = 0.6f;
+
+	// Ширина полосы под магазины вдоль края фигуры, в клетках
+	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "1"))
+	int32 ShopStripWidth = 2;
+
+	// Ширина полосы под магазины вдоль края фигуры, в клетках
+	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "1"))
+	int32 CorridorWidth  = 2;
 
 	UFUNCTION(CallInEditor, Category = "Mall")
 	void DrawGrid();
@@ -85,4 +95,11 @@ private:
 
 	// true, если в фигуре есть замкнутая пустота
 	bool HasHoles() const;
+
+	// true, если клетка с такими координатами есть в мелкой сетке
+	bool IsCellInBounds(int32 X, int32 Y) const;
+
+	// Расстояние от клетки до ближайшей улицы, от 1 до MaxDistance.
+	// Если улицы в пределах MaxDistance нет, возвращает MaxDistance + 1
+	int32 GetDistanceToEdge(int32 X, int32 Y, int32 MaxDistance) const;
 };
