@@ -53,24 +53,77 @@ void AMallGenerator::DrawGrid()
 
 void AMallGenerator::Generate()
 {
+	GridWidth = ShapeBlocksX * BlockSize;
+	GridHeight = ShapeBlocksY * BlockSize;
+
 	Cells.Init(ECellType::Empty, GridWidth * GridHeight);
 
-	if (bRandomSeed)
-	{
+	if (bRandomSeed) {
 		Seed = FMath::Rand();
 	}
-
-	// Initialize(зерно): запускает цепочку случайных чисел с начала
-	// от зерна Seed. ѕосле этого при одном и том же Seed
-	// все следующие вызовы Rng выдают одни и те же числа
 	Rng.Initialize(Seed);
 
-	for (int32 Y = 0; Y < GridHeight; ++Y)
-	{
-		for (int32 X = 0; X < GridWidth; ++X)
+	Blocks.Init(false, ShapeBlocksX * ShapeBlocksY);
+
+	//  оординаты центрального блока.
+	const int32 StartX = ShapeBlocksX / 2;
+	const int32 StartY = ShapeBlocksY / 2;
+	Blocks[GetBlockIndex(StartX, StartY)] = true;
+
+	// —колько блоков должно быть в фигуре.
+	// FMath::RoundToInt(число) округл€ет дробное число до ближайшего целого
+	// FMath::Max(a, b) возвращает большее из двух
+	const int32 TargetBlocks = FMath::Max(1, FMath::RoundToInt(ShapeBlocksX * ShapeBlocksY * ShapeFill));
+
+	// FIntPoint Ч структура Unreal из двух целых чисел X и Y,
+	TArray<FIntPoint> Filled;
+	Filled.Add(FIntPoint(StartX, StartY));
+	int32 Attempts = 0;
+
+	while (Filled.Num() < TargetBlocks && Attempts < 1000) {
+		++Attempts;
+
+		// ЅерЄм из массива случайный блок фигуры
+		const FIntPoint From = Filled[Rng.RandRange(0, Filled.Num() - 1)];
+		const int32 Dir = Rng.RandRange(0, 3);
+
+		FIntPoint Next = From;
+		switch (Dir) {
+		case 0 :
+			Next.Y += 1;
+			break;
+		case 1:
+			Next.X += 1;
+			break;
+		case 2:
+			Next.Y -= 1;
+			break;
+		case 3:
+			Next.X -= 1;
+			break;
+		}
+
+		// ѕровер€ем, что сосед не вышел за пределы крупной сетки.
+		if (Next.X < 0 || Next.Y < 0 || Next.X >= ShapeBlocksX || Next.Y >= ShapeBlocksY) {
+			continue;
+		}
+
+		// ≈сли сосед уже входит в фигуру, пристраивать нечего
+		if (Blocks[GetBlockIndex(Next.X, Next.Y)])
 		{
-			if (Rng.FRand() < 0.3f)
-			{
+			continue;
+		}
+
+		Blocks[GetBlockIndex(Next.X, Next.Y)] = true;
+		Filled.Add(Next);
+	}
+
+	for (int32 Y = 0; Y < GridHeight; ++Y) {
+		for (int32 X = 0; X < GridWidth; ++X) {
+			const int32 BX = X / BlockSize;
+			const int32 BY = Y / BlockSize;
+
+			if (Blocks[GetBlockIndex(BX, BY)]) {
 				Cells[GetIndex(X, Y)] = ECellType::Corridor;
 			}
 		}
@@ -82,4 +135,8 @@ void AMallGenerator::Generate()
 int32 AMallGenerator::GetIndex(int32 X, int32 Y) const
 {
 	return Y * GridWidth + X;
+}
+
+int32 AMallGenerator::GetBlockIndex(int32 BX, int32 BY) const {
+	return BY * ShapeBlocksX + BX;
 }

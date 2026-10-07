@@ -1,18 +1,18 @@
-#pragma once
+п»ї#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "MallGenerator.generated.h"
 
-// UENUM — пометка для Unreal Header Tool, как UCLASS, только для перечислений.
-// enum class — тип с фиксированным списком значений. Обращаться к ним
-// нужно через имя типа: ECellType::Corridor.
-// : uint8 — каждое значение занимает 1 байт (числа 0–255)
+// UENUM вЂ” РїРѕРјРµС‚РєР° РґР»СЏ Unreal Header Tool, РєР°Рє UCLASS, С‚РѕР»СЊРєРѕ РґР»СЏ РїРµСЂРµС‡РёСЃР»РµРЅРёР№.
+// enum class вЂ” С‚РёРї СЃ С„РёРєСЃРёСЂРѕРІР°РЅРЅС‹Рј СЃРїРёСЃРєРѕРј Р·РЅР°С‡РµРЅРёР№. РћР±СЂР°С‰Р°С‚СЊСЃСЏ Рє РЅРёРј
+// РЅСѓР¶РЅРѕ С‡РµСЂРµР· РёРјСЏ С‚РёРїР°: ECellType::Corridor.
+// : uint8 вЂ” РєР°Р¶РґРѕРµ Р·РЅР°С‡РµРЅРёРµ Р·Р°РЅРёРјР°РµС‚ 1 Р±Р°Р№С‚ (С‡РёСЃР»Р° 0вЂ“255)
 UENUM()
 enum class ECellType : uint8
 {
-	Empty,     // пустота
-	Corridor   // коридор
+	Empty,     // РїСѓСЃС‚РѕС‚Р°
+	Corridor   // РєРѕСЂРёРґРѕСЂ
 };
 
 UCLASS()
@@ -29,14 +29,32 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Mall")
 	bool bRandomSeed = false;
 
-	UPROPERTY(EditAnywhere, Category = "Mall", meta = (ClampMin = "1"))
-	int32 GridWidth = 10;
+	// VisibleAnywhere РІРјРµСЃС‚Рѕ EditAnywhere: РїРѕР»Рµ РІРёРґРЅРѕ РІ СЂРµРґР°РєС‚РѕСЂРµ,
+	// РЅРѕ РјРµРЅСЏС‚СЊ РµРіРѕ РІСЂСѓС‡РЅСѓСЋ РЅРµР»СЊР·СЏ. Р Р°Р·РјРµСЂ РјРµР»РєРѕР№ СЃРµС‚РєРё С‚РµРїРµСЂСЊ
+	// РІС‹С‡РёСЃР»СЏРµС‚СЃСЏ РІ Generate РёР· С‡РёСЃР»Р° Р±Р»РѕРєРѕРІ
+	UPROPERTY(VisibleAnywhere, Category = "Mall")
+	int32 GridWidth = 0;
 
-	UPROPERTY(EditAnywhere, Category = "Mall", meta = (ClampMin = "1"))
-	int32 GridHeight = 8;
+	UPROPERTY(VisibleAnywhere, Category = "Mall")
+	int32 GridHeight = 0;
 
 	UPROPERTY(EditAnywhere, Category = "Mall", meta = (ClampMin = "50.0"))
 	float CellSize = 400.f;
+
+	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "1"))
+	int32 ShapeBlocksX = 6;
+
+	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "1"))
+	int32 ShapeBlocksY = 4;
+
+	// РЎС‚РѕСЂРѕРЅР° РѕРґРЅРѕРіРѕ Р±Р»РѕРєР° РІ РєР»РµС‚РєР°С… РјРµР»РєРѕР№ СЃРµС‚РєРё (8 РєР»РµС‚РѕРє Г— 4 Рј = 32 Рј)
+	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "1"))
+	int32 BlockSize = 8;
+
+	// РљР°РєСѓСЋ РґРѕР»СЋ РєСЂСѓРїРЅРѕР№ СЃРµС‚РєРё Р·Р°РїРѕР»РЅРёС‚СЊ: 0.6 = 60% Р±Р»РѕРєРѕРІ.
+	// ClampMin Рё ClampMax РЅРµ РґР°СЋС‚ РІРІРµСЃС‚Рё Р·РЅР°С‡РµРЅРёРµ РјРµРЅСЊС€Рµ 0 РёР»Рё Р±РѕР»СЊС€Рµ 1
+	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float ShapeFill = 0.6f;
 
 	UFUNCTION(CallInEditor, Category = "Mall")
 	void DrawGrid();
@@ -45,17 +63,22 @@ public:
 	void Generate();
 
 private:
-	// TArray — динамический массив Unreal
-	// Без UPROPERTY: показывать в редакторе и сохранять его не нужно,
-	// мы каждый раз генерируем заново.
 	TArray<ECellType> Cells;
 
-	// Переводит координаты (X, Y) в номер элемента массива.
-	// const в конце — функция только читает данные и ничего не меняет.
+	// РљСЂСѓРїРЅР°СЏ СЃРµС‚РєР°: РґР»СЏ РєР°Р¶РґРѕРіРѕ Р±Р»РѕРєР° true вЂ” РІС…РѕРґРёС‚ РІ С„РёРіСѓСЂСѓ, false вЂ” РЅРµС‚.
+	// РҐСЂР°РЅРёС‚СЃСЏ С‚Р°Рє Р¶Рµ РѕРґРЅРѕР№ СЃС‚СЂРѕРєРѕР№, РєР°Рє Cells
+	TArray<bool> Blocks;
+
+	// РџРµСЂРµРІРѕРґРёС‚ РєРѕРѕСЂРґРёРЅР°С‚С‹ (X, Y) РІ РЅРѕРјРµСЂ СЌР»РµРјРµРЅС‚Р° РјР°СЃСЃРёРІР°.
+	// const РІ РєРѕРЅС†Рµ вЂ” С„СѓРЅРєС†РёСЏ С‚РѕР»СЊРєРѕ С‡РёС‚Р°РµС‚ РґР°РЅРЅС‹Рµ Рё РЅРёС‡РµРіРѕ РЅРµ РјРµРЅСЏРµС‚.
 	int32 GetIndex(int32 X, int32 Y) const;
 
-	// FRandomStream — генератор случайных чисел Unreal.
-	// Хранит своё зерно и выдаёт из него цепочку чисел.
-	// Без UPROPERTY: в редакторе его показывать не нужно
+	// РўРѕ Р¶Рµ, С‡С‚Рѕ GetIndex, С‚РѕР»СЊРєРѕ РґР»СЏ РєСЂСѓРїРЅРѕР№ СЃРµС‚РєРё:
+	// РїРµСЂРµРІРѕРґРёС‚ РєРѕРѕСЂРґРёРЅР°С‚С‹ Р±Р»РѕРєР° (BX, BY) РІ РЅРѕРјРµСЂ РІ РјР°СЃСЃРёРІРµ Blocks
+	int32 GetBlockIndex(int32 BX, int32 BY) const;
+
+	// FRandomStream вЂ” РіРµРЅРµСЂР°С‚РѕСЂ СЃР»СѓС‡Р°Р№РЅС‹С… С‡РёСЃРµР» Unreal.
+	// РҐСЂР°РЅРёС‚ СЃРІРѕС‘ Р·РµСЂРЅРѕ Рё РІС‹РґР°С‘С‚ РёР· РЅРµРіРѕ С†РµРїРѕС‡РєСѓ С‡РёСЃРµР».
+	// Р‘РµР· UPROPERTY: РІ СЂРµРґР°РєС‚РѕСЂРµ РµРіРѕ РїРѕРєР°Р·С‹РІР°С‚СЊ РЅРµ РЅСѓР¶РЅРѕ
 	FRandomStream Rng;
 };
