@@ -57,7 +57,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "1"))
 	int32 ShapeBlocksY = 4;
 
-	// Сторона одного блока в клетках мелкой сетки (8 клеток × 4 м = 32 м)
+	// Сторона одного блока в клетках мелкой сетки
 	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "1"))
 	int32 BlockSize = 12;
 
@@ -68,11 +68,27 @@ public:
 
 	// Ширина полосы под магазины вдоль края фигуры, в клетках
 	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "1"))
-	int32 ShopStripWidth = 2;
+	int32 ShopStripWidth = 3;
 
-	// Ширина полосы под магазины вдоль края фигуры, в клетках
+	// Ширина полосы под основной коридор
 	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "1"))
-	int32 CorridorWidth  = 2;
+	int32 CorridorWidth = 5;
+
+	// Минимальная длина широкого поперечного коридора, в клетках
+	UPROPERTY(EditAnywhere, Category = "Mall|Zones", meta = (ClampMin = "1"))
+	int32 MinCrossingLength = 10;
+
+	// Количество коридоров
+	UPROPERTY(EditAnywhere, Category = "Mall|Zones", meta = (ClampMin = "0"))
+	int32 CrossingCount = 8;
+
+	// Веса ширины коридоров
+	UPROPERTY(EditAnywhere, Category = "Mall|Zones")
+	TArray<float> CrossingWidthWeights {10.0f, 10.0f, 25.0f, 25.0f, 20.0f};
+
+	// Проверка на длину для широких коридоров (от стольки-то ячеек шириной)
+	UPROPERTY(EditAnywhere, Category = "Mall|Zones", meta = (ClampMin = "1"))
+	int32 MinLengthFromWidth = 4;
 
 	UFUNCTION(CallInEditor, Category = "Mall")
 	void DrawGrid();
@@ -121,4 +137,14 @@ private:
 
 	// Расставляет плитки пола под клетками коридора
 	void BuildFloor();
+
+	// true, если клетка существует в сетке и имеет тип Type.
+	// Удобно для проверок: клетка за краем сетки просто даёт false
+	bool IsCellType(FIntPoint Cell, ECellType Type) const;
+
+	// Пытается проложить один поперечный коридор. true — если получилось
+	bool TryPlaceCrossing();
+
+	// Выбирает рандомную ширину коридора 
+	int32 PickCrossingWidth();
 };

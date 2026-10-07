@@ -162,6 +162,17 @@ void AMallGenerator::Generate()
 		}
 	}
 
+	// Генерация коридоров
+	int32 CrossingAttempts = 0;
+	int32 TotalCrossings = 0;
+	while (CrossingAttempts < CrossingCount * 50 && TotalCrossings < CrossingCount) {
+		if (TryPlaceCrossing()) {
+			++TotalCrossings;
+		}
+		++CrossingAttempts;
+	}
+	UE_LOG(LogTemp, Warning, TEXT("Crossings: %d / %d"), TotalCrossings, CrossingCount);
+
 	BuildFloor();
 	DrawGrid();
 	
@@ -313,4 +324,146 @@ void AMallGenerator::BeginPlay() {
 	if (bGenerateOnBeginPlay) {
 		Generate();
 	}
+}
+
+bool AMallGenerator::IsCellType(FIntPoint Cell, ECellType Type) const {
+	if (!IsCellInBounds(Cell.X, Cell.Y)) {
+		return false;
+	}
+	return Cells[GetIndex(Cell.X, Cell.Y)] == Type;
+}
+
+bool AMallGenerator::TryPlaceCrossing() {
+	// Создание списка AllEmptyCells где все клетки имеют тип Empty
+	TArray<FIntPoint> AllEmptyCells;
+	for (int32 Y = 0; Y < GridHeight; ++Y) {
+		for (int32 X = 0; X < GridWidth; ++X) {
+			const FIntPoint CurrentPoint(X, Y);
+			if (IsCellType(CurrentPoint, ECellType::Empty)) {
+				AllEmptyCells.Add(CurrentPoint);
+			}
+		}
+	}
+
+	// Проверка на пустой список AllEmptyCells
+	if (AllEmptyCells.Num() == 0)
+	{
+		return false;
+	}
+
+	// 1. Случайная клетка. Подходит только внутренняя часть здания
+	const FIntPoint Start = AllEmptyCells[Rng.RandRange(0, AllEmptyCells.Num() - 1)];
+
+	// 2. Направление. Step — шаг вдоль будущего коридора,
+	// Side — шаг поперёк него, к соседней параллельной полосе
+	FIntPoint Step;
+	FIntPoint Side;
+	if (Rng.RandRange(0, 1) == 0) {
+		Step = FIntPoint(1, 0);
+		Side = FIntPoint(0, 1);
+	}
+	else {
+		Step = FIntPoint(0, 1);
+		Side = FIntPoint(1, 0);
+	}
+
+	const int32 Width = PickCrossingWidth();
+
+	// 3. Луч назад: пока следующая клетка назад серая, сдвигаемся на неё.
+	// В итоге First — самая дальняя серая клетка в этом направлении
+	FIntPoint First = Start;
+	while (IsCellType(First - Step, ECellType::Empty)) {
+		First = First - Step;
+	}
+
+	FIntPoint Last = Start;
+	while (IsCellType(Last + Step, ECellType::Empty)) {
+		Last = Last + Step;
+	}
+
+	const int32 Length = (Last.X - First.X) + (Last.Y - First.Y) + 1;
+
+	// слишком короткий широкий коридор отбрасываем.
+	if (Length < MinCrossingLength && Width >= MinLengthFromWidth)
+	{
+		return false;
+	}
+
+	// 4. Проверяем все полосы будущего коридора.
+	// Lane - CorridorWidth / 2 — сдвиг полосы от центральной линии.
+	// При ширине 5: Lane = 0..4, сдвиги -2, -1, 0, 1, 2 — коридор по центру луча
+	for (int32 Lane = 0; Lane < Width; ++Lane) {
+		// оффсет от центральной линии. Например (0, -2) от центральной линии
+		const FIntPoint Offset = Side * (Lane - Width / 2);
+
+		// За обоими концами полосы должен быть коридор
+		if (!IsCellType(First - Step + Offset, ECellType::Corridor) ||
+			!IsCellType(Last + Step + Offset, ECellType::Corridor)) {
+			return false;
+		}
+
+		// Все клетки полосы от First до Last должны быть серыми.
+		// First + Step * i — i-я клетка от начала полосы
+		for (int32 i = 0; i < Length; ++i) {
+			if (!IsCellType(First + Step * i + Offset, ECellType::Empty)) {
+				return false;
+			}
+		}
+	}
+
+	// Сдвиги крайних полос от центральной линии. При ширине 5 полосы идут
+	// со сдвигами -2..2, значит LowOffset = -2, HighOffset = 2.
+	// При ширине 2: сдвиги -1 и 0, LowOffset = -1, HighOffset = 0
+	const int32 LowOffset = -(Width / 2);
+	const int32 HighOffset = Width - 1 - Width / 2;
+
+	// Сколько серых клеток должно остаться с каждой стороны :
+	const int32 MinGap = 2 * ShopStripWidth;
+
+	// 5. Проверка на то что линии сверху и снизу коридора свободны под магазины
+	for (int32 i = 0; i < Length; ++i) {
+		// i-я клетка центральной линии
+		const FIntPoint LineCell = First + Step * i;
+
+		for (int32 Gap = 1; Gap <= MinGap; ++Gap) {
+			const FIntPoint Below = LineCell + Side * (LowOffset - Gap);
+			const FIntPoint Above = LineCell + Side * (HighOffset + Gap);
+
+			if (IsCellType(Below, ECellType::Corridor) || IsCellType(Above, ECellType::Corridor)) {
+				return false;
+			}
+		}
+	}
+
+	// 6. Все проверки пройдены — закрашиваем полосы коридором
+	for (int32 Lane = 0; Lane < Width; ++Lane) {
+		const FIntPoint Offset = Side * (Lane - Width / 2);
+		for (int32 i = 0; i < Length; i++) {
+			const FIntPoint Cell = First + Step * i + Offset;
+			Cells[GetIndex(Cell.X, Cell.Y)] = ECellType::Corridor;
+		}
+	}
+
+	return true;
+}
+
+int32 AMallGenerator::PickCrossingWidth() {
+	if (CrossingWidthWeights.Num() == 0) {
+		return CorridorWidth;
+	}
+
+	float WeightSum = 0.0f;
+	for (int32 i = 0; i < CrossingWidthWeights.Num(); ++i) {
+		WeightSum += CrossingWidthWeights[i];
+	}
+
+	// Как только рандомный вес становится <= 0, то значит эту ширину коридора возвращаем
+	float RandomPickedWeight = Rng.FRandRange(0.f, WeightSum);
+	for (int32 i = 0; i < CrossingWidthWeights.Num(); ++i) {
+		RandomPickedWeight -= CrossingWidthWeights[i];
+		if (RandomPickedWeight <= 0.0f) {
+			return i  + 1;
+		}
+	}
+	return CrossingWidthWeights.Num();
 }
