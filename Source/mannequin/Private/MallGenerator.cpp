@@ -185,9 +185,19 @@ void AMallGenerator::Generate()
 	}
 	UE_LOG(LogTemp, Warning, TEXT("Cuts: %d / %d"), TotalCuts, CutCount);
 
+	// √енераци€ коридоров с тупиками
+	int32 SpurAttempts = 0;
+	int32 TotalSpurs = 0;
+	while (SpurAttempts < SpurCount * 50 && TotalSpurs < SpurCount) {
+		if (TryPlaceSpur()) {
+			++TotalSpurs;
+		}
+		++SpurAttempts;
+	}
+	UE_LOG(LogTemp, Warning, TEXT("Spurs: %d / %d"), TotalSpurs, SpurCount);
+
 	BuildFloor();
 	DrawGrid();
-	
 }
 
 int32 AMallGenerator::GetIndex(int32 X, int32 Y) const
@@ -614,5 +624,68 @@ bool AMallGenerator::TryPlaceCut() {
 	DeadEnds.Add(Center + Step * (-CutThickness / 2 - 1));
 	DeadEnds.Add(Center + Step * (CutThickness - CutThickness / 2));
 
+	return true;
+}
+
+bool AMallGenerator::TryPlaceSpur() {
+	TArray<FIntPoint> AllCorridorCells = GetAllCorridorCells();
+	if (AllCorridorCells.Num() == 0) {
+		return false;
+	}
+
+	const FIntPoint StartCell = AllCorridorCells[Rng.RandRange(0, AllCorridorCells.Num() - 1)];
+
+	const FIntPoint Step = GetNeighbor(StartCell, Rng.RandRange(0, 3)) - StartCell;
+	const FIntPoint Side(Step.Y, Step.X);
+
+	const int32 Width = PickCrossingWidth();
+	const int32 Length = Rng.RandRange(MinSpurLength, MaxSpurLength);
+
+	// ѕроверка что начальные клетки - коридор, а остальные по длине + место под магазины - пустые клетки
+	for (int32 Lane = 0; Lane < Width; ++Lane) {
+
+		const FIntPoint Offset = Side * (Lane - Width / 2);
+		if (!IsCellType(StartCell + Offset, ECellType::Corridor)) {
+			return false;
+		}
+
+		for (int32 i = 1; i <= Length + ShopStripWidth; ++i) {
+			const FIntPoint CurrentPoint = StartCell + Step * i + Offset;
+			if (!IsCellType(CurrentPoint, ECellType::Empty)) {
+				return false;
+			}
+		}
+	}
+
+	// Ќе умножал на 2, чтобы добавить вариативности
+	const int32 MinGap = ShopStripWidth;
+
+	const int32 LowOffset = -(Width / 2);
+	const int32 HighOffset = Width - Width / 2 - 1;
+
+	// ѕроверка что клетки вокруг коридора пустые
+	for (int32 i = 1; i <= Length; ++i) {
+		const FIntPoint CenterCell = StartCell + Step * i;
+
+		for (int32 Gap = 1; Gap <= MinGap; ++Gap) {
+			const FIntPoint Above = CenterCell + Side * (HighOffset + Gap);
+			const FIntPoint Below = CenterCell + Side * (LowOffset - Gap);
+
+			if (!IsCellType(Above, ECellType::Empty) || !IsCellType(Below, ECellType::Empty)) {
+				return false;
+			}
+		}
+	}
+
+	// «аполнение коридора
+	for (int32 Lane = 0; Lane < Width; ++Lane) {
+		const FIntPoint Offset = Side * (Lane - Width / 2);
+		for (int32 i = 1; i <= Length; ++i) {
+			const FIntPoint CurrentPoint = StartCell + Step * i + Offset;
+			Cells[GetIndex(CurrentPoint.X, CurrentPoint.Y)] = ECellType::Corridor;
+		}
+	}
+
+	DeadEnds.Add(StartCell + Step * Length);
 	return true;
 }

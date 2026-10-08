@@ -101,6 +101,15 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Mall|Zones", meta = (ClampMin = "0"))
 	int32 CutCount = 3;
 
+	UPROPERTY(EditAnywhere, Category = "Mall|Zones", meta = (ClampMin = "1"))
+	int32 MinSpurLength = 5;
+
+	UPROPERTY(EditAnywhere, Category = "Mall|Zones", meta = (ClampMin = "1"))
+	int32 MaxSpurLength = 12;
+
+	UPROPERTY(EditAnywhere, Category = "Mall|Zones", meta = (ClampMin = "0"))
+	int32 SpurCount = 4;
+
 	UFUNCTION(CallInEditor, Category = "Mall")
 	void DrawGrid();
 
@@ -116,7 +125,7 @@ private:
 	TArray<ECellType> Cells;
 	TArray<bool> Blocks;
 
-	// Список точек с центрами коридоров до и после перегородки.
+	// Список точек - центров тупиков.
 	TArray<FIntPoint> DeadEnds;
 
 	// Переводит координаты (X, Y) в номер элемента массива.
@@ -170,4 +179,7 @@ private:
 
 	// Функция для вставки перегородки
 	bool TryPlaceCut();
+
+	// Функция для вставки коридора с тупиком
+	bool TryPlaceSpur();
 };
