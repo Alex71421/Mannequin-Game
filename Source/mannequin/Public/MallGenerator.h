@@ -90,6 +90,17 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Mall|Zones", meta = (ClampMin = "1"))
 	int32 MinLengthFromWidth = 4;
 
+	// Ширина перегородки на основном коридоре
+	UPROPERTY(EditAnywhere, Category = "Mall|Zones", meta = (ClampMin = "1"))
+	int32 CutThickness = 4;
+
+	// Минимальная длина тупика в клетках: сколько клеток прямого коридора
+	UPROPERTY(EditAnywhere, Category = "Mall|Zones", meta = (ClampMin = "1"))
+	int32 MinDeadEndLength = 5;
+
+	UPROPERTY(EditAnywhere, Category = "Mall|Zones", meta = (ClampMin = "0"))
+	int32 CutCount = 3;
+
 	UFUNCTION(CallInEditor, Category = "Mall")
 	void DrawGrid();
 
@@ -104,6 +115,9 @@ protected:
 private:
 	TArray<ECellType> Cells;
 	TArray<bool> Blocks;
+
+	// Список точек с центрами коридоров до и после перегородки.
+	TArray<FIntPoint> DeadEnds;
 
 	// Переводит координаты (X, Y) в номер элемента массива.
 	int32 GetIndex(int32 X, int32 Y) const;
@@ -147,4 +161,13 @@ private:
 
 	// Выбирает рандомную ширину коридора 
 	int32 PickCrossingWidth();
+
+	// Функция для проверки что от любой клетки коридора можно дойти от любой другой
+	bool AreCorridorsConnected() const;
+
+	// Функция для получения списка всех клеток коридора
+	TArray<FIntPoint> GetAllCorridorCells() const;
+
+	// Функция для вставки перегородки
+	bool TryPlaceCut();
 };

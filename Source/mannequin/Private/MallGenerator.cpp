@@ -79,6 +79,7 @@ void AMallGenerator::Generate()
 	GridHeight = ShapeBlocksY * BlockSize;
 
 	Cells.Init(ECellType::Outside, GridWidth * GridHeight);
+	DeadEnds.Reset();
 
 	if (bRandomSeed) {
 		Seed = FMath::Rand();
@@ -172,6 +173,17 @@ void AMallGenerator::Generate()
 		++CrossingAttempts;
 	}
 	UE_LOG(LogTemp, Warning, TEXT("Crossings: %d / %d"), TotalCrossings, CrossingCount);
+
+	// √енераци€ тупиков
+	int32 CutAttempts = 0;
+	int32 TotalCuts = 0;
+	while (CutAttempts < CutCount * 50 && TotalCuts < CutCount) {
+		if (TryPlaceCut()) {
+			++TotalCuts;
+		}
+		++CutAttempts;
+	}
+	UE_LOG(LogTemp, Warning, TEXT("Cuts: %d / %d"), TotalCuts, CutCount);
 
 	BuildFloor();
 	DrawGrid();
@@ -466,4 +478,141 @@ int32 AMallGenerator::PickCrossingWidth() {
 		}
 	}
 	return CrossingWidthWeights.Num();
+}
+
+TArray<FIntPoint> AMallGenerator::GetAllCorridorCells() const {
+	// ѕолучаем список всех клеток корридора
+	TArray<FIntPoint> AllCorridorCells;
+
+	for (int32 Y = 0; Y < GridHeight; ++Y) {
+		for (int32 X = 0; X < GridWidth; ++X) {
+			const FIntPoint CurrentPoint(X, Y);
+			if (IsCellType(CurrentPoint, ECellType::Corridor)) {
+				AllCorridorCells.Add(CurrentPoint);
+			}
+		}
+	}
+
+	return AllCorridorCells;
+}
+
+bool AMallGenerator::AreCorridorsConnected() const {
+	
+	TArray<FIntPoint> AllCorridorCells = GetAllCorridorCells();
+
+	if (AllCorridorCells.Num() == 0) {
+		return true;
+	}
+
+	// —тартова€ клетка коридора
+	const FIntPoint StartCorridorPoint = AllCorridorCells[0];
+	
+	TArray<FIntPoint> Queue;
+	Queue.Add(StartCorridorPoint);
+
+	TArray<bool> Visited;
+	Visited.Init(false, GridHeight * GridWidth);
+	Visited[GetIndex(StartCorridorPoint.X, StartCorridorPoint.Y)] = true;
+
+	// «аполнение коридоров водой с нарастающим списком
+	for (int32 i = 0; i < Queue.Num(); ++i) {
+		const FIntPoint CurrentCorridor = Queue[i];
+
+		for (int32 Dir = 0; Dir < 4; ++Dir) {
+			const FIntPoint NeighborCell = GetNeighbor(CurrentCorridor, Dir);
+
+			// ѕроверка на тип клетки и уже залитость
+			if (IsCellType(NeighborCell, ECellType::Corridor)) {
+				if (!Visited[GetIndex(NeighborCell.X, NeighborCell.Y)]) {
+					Queue.Add(NeighborCell);
+					Visited[GetIndex(NeighborCell.X, NeighborCell.Y)] = true;
+				}
+			}
+		}
+	}
+
+	return Queue.Num() == AllCorridorCells.Num();
+}
+
+bool AMallGenerator::TryPlaceCut() {
+	TArray<FIntPoint> AllCorridorCells = GetAllCorridorCells();
+	if (AllCorridorCells.Num() == 0) {
+		return false;
+	}
+
+	const FIntPoint StartCell = AllCorridorCells[Rng.RandRange(0, AllCorridorCells.Num() - 1)];
+
+	// Step Ч шаг вдоль будущего коридора,
+	// Side Ч шаг поперЄк него, к соседней параллельной полосе
+	FIntPoint Step;
+	FIntPoint Side;
+	if (Rng.RandRange(0, 1) == 0) {
+		Step = FIntPoint(1, 0);
+		Side = FIntPoint(0, 1);
+	}
+	else {
+		Step = FIntPoint(0, 1);
+		Side = FIntPoint(1, 0);
+	}
+
+	FIntPoint First = StartCell;
+	while (IsCellType(First - Side, ECellType::Corridor)) {
+		First -= Side;
+	}
+
+	FIntPoint Last = StartCell;
+	while (IsCellType(Last + Side, ECellType::Corridor)) {
+		Last += Side;
+	}
+
+	const int32 Length = (Last.X - First.X) + (Last.Y - First.Y) + 1;
+
+	if (Length != CorridorWidth) {
+		return false;
+	}
+
+
+	// ѕроверка срезов коридора вдоль Step.  аждый срез Ч это поперечна€ лини€, сдвинута€ на Step * k
+	for (int32 Lane = -MinDeadEndLength; Lane < CutThickness + MinDeadEndLength; ++Lane) {
+		const FIntPoint Offset = Step * (Lane - CutThickness / 2);
+
+		if (IsCellType(First - Side + Offset, ECellType::Corridor) ||
+			IsCellType(Last + Side + Offset, ECellType::Corridor)) {
+			return false;
+		}
+
+		for (int32 i = 0; i < Length; ++i) {
+			if (!IsCellType(First + Side * i + Offset, ECellType::Corridor)) {
+				return false;
+			}
+		}
+	}
+
+	// «аполнение клеток коридора пустыми клетками
+	for (int32 Lane = 0; Lane < CutThickness; ++Lane) {
+		const FIntPoint Offset = Step * (Lane - CutThickness / 2);
+		for (int32 i = 0; i < Length; ++i) {
+			const FIntPoint CurrentPoint = First + Side * i + Offset;
+			Cells[GetIndex(CurrentPoint.X, CurrentPoint.Y)] = ECellType::Empty;
+		}
+	}
+
+	// ќткат если нет соединени€
+	if (!AreCorridorsConnected()) {
+		// «аполнение клеток коридора коридорами
+		for (int32 Lane = 0; Lane < CutThickness; ++Lane) {
+			const FIntPoint Offset = Step * (Lane - CutThickness / 2);
+			for (int32 i = 0; i < Length; ++i) {
+				const FIntPoint CurrentPoint = First + Side * i + Offset;
+				Cells[GetIndex(CurrentPoint.X, CurrentPoint.Y)] = ECellType::Corridor;
+			}
+		}
+		return false;
+	}
+
+	const FIntPoint Center = First + Side * (Length / 2);
+	DeadEnds.Add(Center + Step * (-CutThickness / 2 - 1));
+	DeadEnds.Add(Center + Step * (CutThickness - CutThickness / 2));
+
+	return true;
 }
