@@ -57,7 +57,7 @@ struct FShopData {
 	UPROPERTY(VisibleAnywhere)
 	FIntPoint Min = FIntPoint::ZeroValue;
 
-	// Ширина и глубина в клетках
+	// Размер по осям X и Y в мире
 	UPROPERTY(VisibleAnywhere)
 	FIntPoint Size = FIntPoint::ZeroValue;
 
@@ -77,6 +77,12 @@ struct FShopData {
 
 	UPROPERTY(VisibleAnywhere)
 	EShopState State = EShopState::Safe;
+};
+
+// Место, где может начинаться витрина магазина
+struct FShopCandidate {
+	FIntPoint Cell;			// желтая или серая клетка
+	FIntPoint ToCorridor;	// Направление от нее к коридору
 };
 
 UCLASS()
@@ -132,7 +138,7 @@ public:
 
 	// Глубина внутренних магазинов в клетках. Определяет отступы
 	// поперечных коридоров и ответвлений, а также место под магазин в конце тупика
-	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "1"))
+	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "2"))
 	int32 InnerShopDepth = 3;
 
 	// Ширина полосы под основной коридор
@@ -177,6 +183,15 @@ public:
 
 	UPROPERTY(VisibleAnywhere, Category = "Mall|Result")
 	TArray<FShopData> Shops;
+
+	UPROPERTY(EditAnywhere, Category = "Mall|Shops", meta = (ClampMin = "1"))
+	int32 MinShopWidth = 2;
+
+	UPROPERTY(EditAnywhere, Category = "Mall|Shops", meta = (ClampMin = "1"))
+	int32 MaxShopWidth = 6;
+
+	UPROPERTY(EditAnywhere, Category = "Mall|Shops", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float SquareShopChance = 0.2f;
 
 	UFUNCTION(CallInEditor, Category = "Mall")
 	void DrawGrid();
@@ -243,8 +258,8 @@ private:
 	// Функция для проверки что от любой клетки коридора можно дойти от любой другой
 	bool AreCorridorsConnected() const;
 
-	// Функция для получения списка всех клеток коридора
-	TArray<FIntPoint> GetAllCorridorCells() const;
+	// Функция для получения списка всех клеток по типу 
+	TArray<FIntPoint> GetAllCells(ECellType Type) const;
 
 	// Функция для вставки перегородки
 	bool TryPlaceCut();
@@ -252,5 +267,7 @@ private:
 	// Функция для вставки коридора с тупиком
 	bool TryPlaceSpur();
 
-
+	// Пытается поставить магазин, витрина которого начинается в StartCell
+	// и смотрит в коридор в направлении ToCorridor
+	bool TryPlaceShopAt(FIntPoint StartCell, FIntPoint ToCorridor);
 };

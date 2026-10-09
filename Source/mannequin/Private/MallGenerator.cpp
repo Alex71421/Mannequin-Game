@@ -66,9 +66,14 @@ void AMallGenerator::DrawGrid()
 			case ECellType::Corridor:
 				Color = FColor::Blue;
 				break;
-			case ECellType::Shop:
-				Color = FColor::Green;
-				break;
+			case ECellType::Shop: {
+				static const FColor ShopColors[] = { FColor::Green, FColor::Cyan, FColor::Magenta, FColor::Orange };
+
+				// Номер магазина этой клетки. % 4 — остаток от деления на 4:
+				// магазины 0, 4, 8... зелёные, 1, 5, 9... голубые и так далее
+				const int32 ShopId = CellShopIds[GetIndex(X, Y)];
+				Color = ShopColors[ShopId % 4];
+				break; } 
 			}
 
 			DrawDebugBox(World, Center, HalfSize, Color, true);
@@ -78,6 +83,7 @@ void AMallGenerator::DrawGrid()
 
 void AMallGenerator::Generate()
 {
+	const double StartTime = FPlatformTime::Seconds();
 	GridWidth = ShapeBlocksX * BlockSize;
 	GridHeight = ShapeBlocksY * BlockSize;
 
@@ -201,7 +207,41 @@ void AMallGenerator::Generate()
 	}
 	UE_LOG(LogTemp, Warning, TEXT("Spurs: %d / %d"), TotalSpurs, SpurCount);
 
+	// генерация магазинов
+	TArray<FIntPoint>  FreeCells = GetAllCells(ECellType::ShopZone);
+	FreeCells.Append(GetAllCells(ECellType::Empty));
+
+	// Часть 1: заполнение списка кандидатов по "пустая клета + коридор рядом"
+	TArray<FShopCandidate> Candidates;
+	for (const FIntPoint& Cell : FreeCells) {
+		for (int32 Dir = 0; Dir <= 3; ++Dir) {
+			FIntPoint Neighbor = GetNeighbor(Cell, Dir);
+			if (IsCellType(Neighbor, ECellType::Corridor)) {
+				FShopCandidate Candidate;
+				Candidate.Cell = Cell;
+				Candidate.ToCorridor = Neighbor - Cell;
+				Candidates.Add(Candidate);
+			}
+		}
+	}
+
+	// Часть 2: перемешивание списка кандидатов
+	for (int32 i = Candidates.Num() - 1; i > 0; --i) {
+		const int32 j = Rng.RandRange(0, i);
+		Candidates.Swap(i, j);
+	}
+
+	// Часть 3: обход и заполнение магазинами
+	int32 TotalShops = 0;
+	for (const FShopCandidate& Candidate : Candidates) {
+		if (TryPlaceShopAt(Candidate.Cell, Candidate.ToCorridor)) {
+			++TotalShops;
+		}
+	}
+	UE_LOG(LogTemp, Warning, TEXT("Shops: %d (candidates: %d)"), TotalShops, Candidates.Num());
+
 	BuildFloor();
+	UE_LOG(LogTemp, Warning, TEXT("Generate: %.1f ms"), (FPlatformTime::Seconds() - StartTime) * 1000.0);
 	DrawGrid();
 }
 
@@ -362,15 +402,7 @@ bool AMallGenerator::IsCellType(FIntPoint Cell, ECellType Type) const {
 
 bool AMallGenerator::TryPlaceCrossing() {
 	// Создание списка AllEmptyCells где все клетки имеют тип Empty
-	TArray<FIntPoint> AllEmptyCells;
-	for (int32 Y = 0; Y < GridHeight; ++Y) {
-		for (int32 X = 0; X < GridWidth; ++X) {
-			const FIntPoint CurrentPoint(X, Y);
-			if (IsCellType(CurrentPoint, ECellType::Empty)) {
-				AllEmptyCells.Add(CurrentPoint);
-			}
-		}
-	}
+	TArray<FIntPoint> AllEmptyCells = GetAllCells(ECellType::Empty);
 
 	// Проверка на пустой список AllEmptyCells
 	if (AllEmptyCells.Num() == 0)
@@ -495,25 +527,23 @@ int32 AMallGenerator::PickCrossingWidth() {
 	return CrossingWidthWeights.Num();
 }
 
-TArray<FIntPoint> AMallGenerator::GetAllCorridorCells() const {
-	// Получаем список всех клеток корридора
-	TArray<FIntPoint> AllCorridorCells;
-
+TArray<FIntPoint> AMallGenerator::GetAllCells(ECellType Type) const {
+	// Получаем список всех клеток по типу Type
+	TArray<FIntPoint> AllCells;
 	for (int32 Y = 0; Y < GridHeight; ++Y) {
 		for (int32 X = 0; X < GridWidth; ++X) {
 			const FIntPoint CurrentPoint(X, Y);
-			if (IsCellType(CurrentPoint, ECellType::Corridor)) {
-				AllCorridorCells.Add(CurrentPoint);
+			if (IsCellType(CurrentPoint, Type)) {
+				AllCells.Add(CurrentPoint);
 			}
 		}
 	}
-
-	return AllCorridorCells;
+	return AllCells;
 }
 
 bool AMallGenerator::AreCorridorsConnected() const {
 	
-	TArray<FIntPoint> AllCorridorCells = GetAllCorridorCells();
+	TArray<FIntPoint> AllCorridorCells = GetAllCells(ECellType::Corridor);
 
 	if (AllCorridorCells.Num() == 0) {
 		return true;
@@ -550,7 +580,7 @@ bool AMallGenerator::AreCorridorsConnected() const {
 }
 
 bool AMallGenerator::TryPlaceCut() {
-	TArray<FIntPoint> AllCorridorCells = GetAllCorridorCells();
+	TArray<FIntPoint> AllCorridorCells = GetAllCells(ECellType::Corridor);
 	if (AllCorridorCells.Num() == 0) {
 		return false;
 	}
@@ -633,7 +663,7 @@ bool AMallGenerator::TryPlaceCut() {
 }
 
 bool AMallGenerator::TryPlaceSpur() {
-	TArray<FIntPoint> AllCorridorCells = GetAllCorridorCells();
+	TArray<FIntPoint> AllCorridorCells = GetAllCells(ECellType::Corridor);
 	if (AllCorridorCells.Num() == 0) {
 		return false;
 	}
@@ -693,4 +723,85 @@ bool AMallGenerator::TryPlaceSpur() {
 
 	DeadEnds.Add(StartCell + Step * Length);
 	return true;
+}
+
+bool AMallGenerator::TryPlaceShopAt(FIntPoint StartCell, FIntPoint ToCorridor) {
+	if (!IsCellType(StartCell, ECellType::ShopZone) && !IsCellType(StartCell, ECellType::Empty)) {
+		return false;
+	}
+	const ECellType StartCellType = Cells[GetIndex(StartCell.X, StartCell.Y)];
+	// от коридора, перпендикулярно коридору
+	const FIntPoint Inward = ToCorridor * (-1);
+	const FIntPoint Along = FIntPoint(ToCorridor.Y, ToCorridor.X);
+
+	const int32 ShopId = Shops.Num();
+
+	int32 Depth;
+	if (StartCellType == ECellType::ShopZone) {
+		Depth = Rng.RandRange(2, ShopStripWidth);
+	}
+	else {
+		Depth = Rng.RandRange(2, InnerShopDepth);
+	}
+
+	int32 Width;
+	if (Rng.FRandRange(0, 1) < SquareShopChance) {
+		Width = Depth;
+	}
+	else {
+		Width = Rng.RandRange(MinShopWidth, MaxShopWidth);
+	}
+
+	// Идеам от большей ширины. Если магазин не вещается - уменьшаем ширину
+	for (int32 W = Width; W >= MinShopWidth; --W) {
+		bool bFits = true;
+		// Проверка, что каждая клетка витрины присоединена к коридору
+		for (int32 i = 0; i < W; ++i) {
+			if (!IsCellType(StartCell + Along * i + ToCorridor, ECellType::Corridor)) {
+				bFits = false;
+				break;
+			}
+		}
+
+		if (!bFits)
+		{
+			continue;
+		}
+
+		// Проверка, что все клетки магазина одинакового типа, что стартовая
+		for (int32 Line = 0; Line < Depth && bFits; ++Line) {
+			for (int32 i = 0; i < W; ++i) {
+				if (!IsCellType(StartCell + Along * i + Inward * Line, StartCellType)) {
+					bFits = false;
+					break;
+				}
+			}
+		}
+
+		if (!bFits)
+		{
+			continue;
+		}
+
+		// Закраска магазина
+		for (int32 Line = 0; Line < Depth; ++Line) {
+			for (int32 i = 0; i < W; ++i) {
+				FIntPoint CurrentPoint = StartCell + Along * i + Inward * Line;
+				Cells[GetIndex(CurrentPoint.X, CurrentPoint.Y)] = ECellType::Shop;
+				CellShopIds[GetIndex(CurrentPoint.X, CurrentPoint.Y)] = ShopId;
+			}
+		}
+
+		FShopData Shop;
+		Shop.DoorCell = StartCell + Along * (W / 2);
+		Shop.DoorDir = ToCorridor;
+		const FIntPoint Corner = StartCell + Along * (W - 1) + Inward * (Depth - 1);
+		// ComponentMin берет наименьший Х и Y у обоих 
+		Shop.Min = Corner.ComponentMin(StartCell);
+		Shop.Size = FIntPoint(FMath::Abs(Corner.X - StartCell.X) + 1, FMath::Abs(Corner.Y - StartCell.Y) + 1);
+		Shops.Add(Shop);
+		return true;
+	}
+	
+	return false;
 }
