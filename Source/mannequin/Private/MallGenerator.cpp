@@ -506,25 +506,37 @@ bool AMallGenerator::TryPlaceCrossing() {
 	return true;
 }
 
-int32 AMallGenerator::PickCrossingWidth() {
-	if (CrossingWidthWeights.Num() == 0) {
-		return CorridorWidth;
+int32 AMallGenerator::PickWeighted(const TArray<float>& Weights) {
+	if (Weights.Num() == 0) {
+		return 0;
 	}
 
 	float WeightSum = 0.0f;
-	for (int32 i = 0; i < CrossingWidthWeights.Num(); ++i) {
-		WeightSum += CrossingWidthWeights[i];
+	for (int32 i = 0; i < Weights.Num(); ++i) {
+		WeightSum += Weights[i];
 	}
 
-	// Как только рандомный вес становится <= 0, то значит эту ширину коридора возвращаем
+	// Как только рандомный вес становится <= 0, то значит этот номер возвращаем
 	float RandomPickedWeight = Rng.FRandRange(0.f, WeightSum);
-	for (int32 i = 0; i < CrossingWidthWeights.Num(); ++i) {
-		RandomPickedWeight -= CrossingWidthWeights[i];
+	for (int32 i = 0; i < Weights.Num(); ++i) {
+		RandomPickedWeight -= Weights[i];
 		if (RandomPickedWeight <= 0.0f) {
-			return i  + 1;
+			return i;
 		}
 	}
-	return CrossingWidthWeights.Num();
+	return Weights.Num() - 1;
+}
+
+int32 AMallGenerator::PickCrossingWidth()
+{
+	// Если веса не заданы, используем ширину основного коридора
+	if (CrossingWidthWeights.Num() == 0)
+	{
+		return CorridorWidth;
+	}
+
+	// PickWeighted возвращает номер от 0, а ширина начинается с 1
+	return PickWeighted(CrossingWidthWeights) + 1;
 }
 
 TArray<FIntPoint> AMallGenerator::GetAllCells(ECellType Type) const {
