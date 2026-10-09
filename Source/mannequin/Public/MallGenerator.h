@@ -193,6 +193,13 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Mall|Shops", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float SquareShopChance = 0.2f;
 
+	// Веса для категорий магазинов
+	UPROPERTY(EditAnywhere, Category = "Mall|Shops")
+	TArray<float> ShopCategoryWeights{ 10.f, 10.f, 10.f, 10.f, 10.f, 10.f, 10.f, 5.f };
+
+	UPROPERTY(EditAnywhere, Category = "Mall|Shops", meta = (ClampMin = "1"))
+	int32 BrandsPerCategory = 3;
+
 	UFUNCTION(CallInEditor, Category = "Mall")
 	void DrawGrid();
 
@@ -207,6 +214,7 @@ protected:
 private:
 	TArray<ECellType> Cells;
 	TArray<bool> Blocks;
+	// Массив всей карты, где каждый магазин имеет на сетке свою цифру - зону
 	TArray<int32> CellShopIds;
 
 	// Список точек - центров тупиков.

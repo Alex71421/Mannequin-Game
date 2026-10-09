@@ -67,12 +67,20 @@ void AMallGenerator::DrawGrid()
 				Color = FColor::Blue;
 				break;
 			case ECellType::Shop: {
-				static const FColor ShopColors[] = { FColor::Green, FColor::Cyan, FColor::Magenta, FColor::Orange };
+				static const FColor CategoryColors[] = {
+					FColor(0, 200, 0),      // Sport       Ч зелЄный
+					FColor(255, 215, 0),    // Luxury      Ч золотой
+					FColor(200, 0, 200),    // Clothing    Ч пурпурный
+					FColor(255, 128, 0),    // Grocery     Ч оранжевый
+					FColor(255, 105, 180),  // Sweets      Ч розовый
+					FColor(0, 220, 220),    // Games       Ч бирюзовый
+					FColor(140, 0, 255),    // Electronics Ч фиолетовый
+					FColor(139, 90, 43),    // Unfinished  Ч коричневый
+					FColor(255, 255, 255)   // Cafe        Ч белый
+				};
 
-				// Ќомер магазина этой клетки. % 4 Ч остаток от делени€ на 4:
-				// магазины 0, 4, 8... зелЄные, 1, 5, 9... голубые и так далее
 				const int32 ShopId = CellShopIds[GetIndex(X, Y)];
-				Color = ShopColors[ShopId % 4];
+				Color = CategoryColors[static_cast<int32>(Shops[ShopId].Category)];
 				break; } 
 			}
 
@@ -239,6 +247,19 @@ void AMallGenerator::Generate()
 		}
 	}
 	UE_LOG(LogTemp, Warning, TEXT("Shops: %d (candidates: %d)"), TotalShops, Candidates.Num());
+
+	// „асть 4. ќпределение типов и брендов магазинов
+	for (FShopData& Shop : Shops) {
+		
+		if (ShopCategoryWeights.Num() > 0)
+		{
+			// static_cast возвращает категорию по номеру
+			const int32 MaxCategory = static_cast<int32>(EShopCategory::Unfinished);
+			const int32 CategoryIndex = FMath::Min(PickWeighted(ShopCategoryWeights), MaxCategory);
+			Shop.Category = static_cast<EShopCategory>(CategoryIndex);
+		}
+		Shop.Brand = Rng.RandRange(0, BrandsPerCategory - 1);
+	}
 
 	BuildFloor();
 	UE_LOG(LogTemp, Warning, TEXT("Generate: %.1f ms"), (FPlatformTime::Seconds() - StartTime) * 1000.0);
