@@ -66,6 +66,9 @@ void AMallGenerator::DrawGrid()
 			case ECellType::Corridor:
 				Color = FColor::Blue;
 				break;
+			case ECellType::Shop:
+				Color = FColor::Green;
+				break;
 			}
 
 			DrawDebugBox(World, Center, HalfSize, Color, true);
@@ -79,6 +82,8 @@ void AMallGenerator::Generate()
 	GridHeight = ShapeBlocksY * BlockSize;
 
 	Cells.Init(ECellType::Outside, GridWidth * GridHeight);
+	CellShopIds.Init(INDEX_NONE, GridWidth * GridHeight);
+	Shops.Reset();
 	DeadEnds.Reset();
 
 	if (bRandomSeed) {

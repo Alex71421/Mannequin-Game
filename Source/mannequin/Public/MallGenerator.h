@@ -16,7 +16,67 @@ enum class ECellType : uint8
 	Outside,   // вне здания
 	Empty,     // внутри здания, пока пусто
 	ShopZone,  // Полоса у края, будущие магазины и глухие стены
-	Corridor   // коридор
+	Corridor,  // коридор
+	Shop	   // магазин
+};
+
+// Категория — что продаётся, определяет внешний вид
+UENUM()
+enum class EShopCategory : uint8
+{
+	Sport,
+	Luxury,
+	Clothing,
+	Grocery,
+	Sweets,
+	Games,
+	Electronics,
+	Unfinished,
+	Cafe
+};
+
+// Состояние — что магазин значит для игрока
+UENUM()
+enum class EShopState : uint8
+{
+	Safe,
+	StaticMannequins,
+	ActiveMannequins,
+	Quest,
+	Locked
+};
+
+// USTRUCT — своя структура Unreal, как FIntPoint, только с нашими полями.
+// Префикс F обязателен для структур. GENERATED_BODY нужен так же, как в классе.
+// UPROPERTY у полей позволяет редактору показывать их, а движку — сохранять
+USTRUCT()
+struct FShopData {
+	GENERATED_BODY()
+
+	// Левый нижний угол магазина в клетках
+	UPROPERTY(VisibleAnywhere)
+	FIntPoint Min = FIntPoint::ZeroValue;
+
+	// Ширина и глубина в клетках
+	UPROPERTY(VisibleAnywhere)
+	FIntPoint Size = FIntPoint::ZeroValue;
+
+	// Клетка магазина, в стене которой стоит дверь
+	UPROPERTY(VisibleAnywhere)
+	FIntPoint DoorCell = FIntPoint::ZeroValue;
+
+	// Направление от двери в коридор: (1, 0), (-1, 0), (0, 1) или (0, -1)
+	UPROPERTY(VisibleAnywhere)
+	FIntPoint DoorDir = FIntPoint::ZeroValue;
+
+	UPROPERTY(VisibleAnywhere)
+	EShopCategory Category = EShopCategory::Unfinished;
+
+	UPROPERTY(VisibleAnywhere)
+	int32 Brand = 0;
+
+	UPROPERTY(VisibleAnywhere)
+	EShopState State = EShopState::Safe;
 };
 
 UCLASS()
@@ -110,6 +170,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Mall|Zones", meta = (ClampMin = "0"))
 	int32 SpurCount = 4;
 
+	UPROPERTY(VisibleAnywhere, Category = "Mall|Result")
+	TArray<FShopData> Shops;
+
 	UFUNCTION(CallInEditor, Category = "Mall")
 	void DrawGrid();
 
@@ -124,6 +187,7 @@ protected:
 private:
 	TArray<ECellType> Cells;
 	TArray<bool> Blocks;
+	TArray<int32> CellShopIds;
 
 	// Список точек - центров тупиков.
 	TArray<FIntPoint> DeadEnds;
@@ -182,4 +246,6 @@ private:
 
 	// Функция для вставки коридора с тупиком
 	bool TryPlaceSpur();
+
+
 };
