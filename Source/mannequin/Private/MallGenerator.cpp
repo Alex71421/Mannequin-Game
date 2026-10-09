@@ -445,7 +445,7 @@ bool AMallGenerator::TryPlaceCrossing() {
 	const int32 HighOffset = Width - 1 - Width / 2;
 
 	// —колько серых клеток должно остатьс€ с каждой стороны :
-	const int32 MinGap = 2 * ShopStripWidth;
+	const int32 MinGap = 2 * InnerShopDepth;
 
 	// 5. ѕроверка на то что линии сверху и снизу коридора свободны под магазины
 	for (int32 i = 0; i < Length; ++i) {
@@ -654,7 +654,7 @@ bool AMallGenerator::TryPlaceSpur() {
 			return false;
 		}
 
-		for (int32 i = 1; i <= Length + ShopStripWidth; ++i) {
+		for (int32 i = 1; i <= Length + InnerShopDepth; ++i) {
 			const FIntPoint CurrentPoint = StartCell + Step * i + Offset;
 			if (!IsCellType(CurrentPoint, ECellType::Empty)) {
 				return false;
@@ -663,7 +663,7 @@ bool AMallGenerator::TryPlaceSpur() {
 	}
 
 	// Ќе умножал на 2, чтобы добавить вариативности
-	const int32 MinGap = ShopStripWidth;
+	const int32 MinGap = InnerShopDepth;
 
 	const int32 LowOffset = -(Width / 2);
 	const int32 HighOffset = Width - Width / 2 - 1;

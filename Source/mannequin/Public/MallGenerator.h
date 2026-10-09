@@ -112,23 +112,28 @@ public:
 	float FloorThickness = 10.f;
 
 	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "1"))
-	int32 ShapeBlocksX = 6;
+	int32 ShapeBlocksX = 4;
 
 	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "1"))
 	int32 ShapeBlocksY = 4;
 
 	// Сторона одного блока в клетках мелкой сетки
 	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "1"))
-	int32 BlockSize = 12;
+	int32 BlockSize = 26;
 
 	// Какую долю крупной сетки заполнить: 0.6 = 60% блоков.
 	// ClampMin и ClampMax не дают ввести значение меньше 0 или больше 1
 	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float ShapeFill = 0.6f;
 
-	// Ширина полосы под магазины вдоль края фигуры, в клетках
+	// Максимальная глубина внешних магазинов
 	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "1"))
-	int32 ShopStripWidth = 3;
+	int32 ShopStripWidth = 5;
+
+	// Глубина внутренних магазинов в клетках. Определяет отступы
+	// поперечных коридоров и ответвлений, а также место под магазин в конце тупика
+	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "1"))
+	int32 InnerShopDepth = 3;
 
 	// Ширина полосы под основной коридор
 	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "1"))
