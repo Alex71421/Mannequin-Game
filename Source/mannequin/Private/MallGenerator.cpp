@@ -234,10 +234,7 @@ void AMallGenerator::Generate()
 	}
 
 	// Часть 2: перемешивание списка кандидатов
-	for (int32 i = Candidates.Num() - 1; i > 0; --i) {
-		const int32 j = Rng.RandRange(0, i);
-		Candidates.Swap(i, j);
-	}
+	ShuffleArray(Candidates);
 
 	// Часть 3: обход и заполнение магазинами
 	int32 TotalShops = 0;
@@ -260,6 +257,19 @@ void AMallGenerator::Generate()
 		}
 		Shop.Brand = Rng.RandRange(0, BrandsPerCategory - 1);
 	}
+
+	// Часть 5. Выбор кафе вместо случайных магазинов
+	TArray<int32> InnerShops;
+	for (int32 i = 0; i < Shops.Num(); ++i) {
+		if (Shops[i].bInner) {
+			InnerShops.Add(i);
+		}
+	}
+	ShuffleArray(InnerShops);
+	for (int32 i = 0; i < FMath::Min(CafeCount, InnerShops.Num()); ++i) {
+		Shops[InnerShops[i]].Category = EShopCategory::Cafe;
+	}
+	UE_LOG(LogTemp, Warning, TEXT("Cafes: %d"), FMath::Min(CafeCount, InnerShops.Num()));
 
 	BuildFloor();
 	UE_LOG(LogTemp, Warning, TEXT("Generate: %.1f ms"), (FPlatformTime::Seconds() - StartTime) * 1000.0);
@@ -832,6 +842,9 @@ bool AMallGenerator::TryPlaceShopAt(FIntPoint StartCell, FIntPoint ToCorridor) {
 		// ComponentMin берет наименьший Х и Y у обоих 
 		Shop.Min = Corner.ComponentMin(StartCell);
 		Shop.Size = FIntPoint(FMath::Abs(Corner.X - StartCell.X) + 1, FMath::Abs(Corner.Y - StartCell.Y) + 1);
+
+		Shop.bInner = (StartCellType == ECellType::Empty);
+
 		Shops.Add(Shop);
 		return true;
 	}

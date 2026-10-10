@@ -77,6 +77,10 @@ struct FShopData {
 
 	UPROPERTY(VisibleAnywhere)
 	EShopState State = EShopState::Safe;
+
+	// true - магазин в серой зоне, иначе false
+	UPROPERTY(VisibleAnywhere)
+	bool bInner = false;
 };
 
 // Место, где может начинаться витрина магазина
@@ -200,6 +204,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Mall|Shops", meta = (ClampMin = "1"))
 	int32 BrandsPerCategory = 3;
 
+	UPROPERTY(EditAnywhere, Category = "Mall|Shops", meta = (ClampMin = "0"))
+	int32 CafeCount = 3;
+
 	UFUNCTION(CallInEditor, Category = "Mall")
 	void DrawGrid();
 
@@ -282,4 +289,14 @@ private:
 	// Пытается поставить магазин, витрина которого начинается в StartCell
 	// и смотрит в коридор в направлении ToCorridor
 	bool TryPlaceShopAt(FIntPoint StartCell, FIntPoint ToCorridor);
+
+	// Функция для перемешки массива
+	// template <typename T> — «T — это какой-то тип, который подставится при вызове».
+	template <typename T>
+	void ShuffleArray(TArray<T>& Array) {
+		for (int32 i = Array.Num() - 1; i > 0; --i) {
+			const int32 j = Rng.RandRange(0, i);
+			Array.Swap(i, j);
+		}
+	}
 };
