@@ -35,15 +35,22 @@ enum class EShopCategory : uint8
 	Cafe
 };
 
-// Состояние — что магазин значит для игрока
+// Состояние, есть ли манекены
 UENUM()
 enum class EShopState : uint8
 {
 	Safe,
 	StaticMannequins,
-	ActiveMannequins,
-	Quest,
-	Locked
+	ActiveMannequins
+};
+
+UENUM()
+enum class EDoorType : uint8
+{
+	Manual,
+	ManualDouble,
+	Automatic,
+	None
 };
 
 // USTRUCT — своя структура Unreal, как FIntPoint, только с нашими полями.
@@ -64,6 +71,10 @@ struct FShopData {
 	// Клетка магазина, в стене которой стоит дверь
 	UPROPERTY(VisibleAnywhere)
 	FIntPoint DoorCell = FIntPoint::ZeroValue;
+
+	// Тип двери в магазин
+	UPROPERTY(VisibleAnywhere)
+	EDoorType DoorType = EDoorType::Manual;
 
 	// Направление от двери в коридор: (1, 0), (-1, 0), (0, 1) или (0, -1)
 	UPROPERTY(VisibleAnywhere)
@@ -88,6 +99,15 @@ struct FShopCandidate {
 	FIntPoint Cell;			// желтая или серая клетка
 	FIntPoint ToCorridor;	// Направление от нее к коридору
 };
+
+USTRUCT()
+struct FStateWeights {
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere)
+	TArray<float> Weights;
+};
+
 
 UCLASS()
 class MANNEQUIN_API AMallGenerator : public AActor
@@ -120,6 +140,10 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "Mall", meta = (ClampMin = "1.0"))
 	float FloorThickness = 10.f;
+
+	// DrawGrid зависит от галочки
+	UPROPERTY(EditAnywhere, Category = "Mall|Debug")
+	bool bShowMannequins = false;
 
 	UPROPERTY(EditAnywhere, Category = "Mall|Shape", meta = (ClampMin = "1"))
 	int32 ShapeBlocksX = 4;
@@ -201,11 +225,22 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Mall|Shops")
 	TArray<float> ShopCategoryWeights{ 10.f, 10.f, 10.f, 10.f, 10.f, 10.f, 10.f, 5.f };
 
+	// Шанс ручной двери
+	UPROPERTY(EditAnywhere, Category = "Mall|Shops", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float ManualDoorChance = 0.5f;
+
+	// Переменная для ширины магазина с двойной дверью
+	UPROPERTY(EditAnywhere, Category = "Mall|Shops", meta = (ClampMin = "0"))
+	int32 MinWidthForDoubleDoor = 4;
+
 	UPROPERTY(EditAnywhere, Category = "Mall|Shops", meta = (ClampMin = "1"))
 	int32 BrandsPerCategory = 3;
 
 	UPROPERTY(EditAnywhere, Category = "Mall|Shops", meta = (ClampMin = "0"))
 	int32 CafeCount = 3;
+
+	UPROPERTY(EditAnywhere, Category = "Mall|Shops")
+	TMap<EShopCategory, FStateWeights> StateWeightsByCategory;
 
 	UFUNCTION(CallInEditor, Category = "Mall")
 	void DrawGrid();
@@ -221,7 +256,7 @@ protected:
 private:
 	TArray<ECellType> Cells;
 	TArray<bool> Blocks;
-	// Массив всей карты, где каждый магазин имеет на сетке свою цифру - зону
+	// Массив всей карты, где каждый магазин имеет на сетке свою цифру - номер
 	TArray<int32> CellShopIds;
 
 	// Список точек - центров тупиков.

@@ -20,6 +20,16 @@ AMallGenerator::AMallGenerator()
 	if (CubeMesh.Succeeded()) {
 		FloorMesh->SetStaticMesh(CubeMesh.Object);
 	}
+
+	StateWeightsByCategory.Add(EShopCategory::Sport, FStateWeights{ {2.f, 4.f, 3.f} });
+	StateWeightsByCategory.Add(EShopCategory::Luxury, FStateWeights{ {1.f, 4.f, 3.f} });
+	StateWeightsByCategory.Add(EShopCategory::Clothing, FStateWeights{ {1.f, 4.f, 3.f} });
+	StateWeightsByCategory.Add(EShopCategory::Grocery, FStateWeights{ {5.f, 2.f, 1.f} });
+	StateWeightsByCategory.Add(EShopCategory::Sweets, FStateWeights{ {5.f, 1.f, 1.f} });
+	StateWeightsByCategory.Add(EShopCategory::Games, FStateWeights{ {7.f, 2.f, 0.f} });
+	StateWeightsByCategory.Add(EShopCategory::Electronics, FStateWeights{ {5.f, 2.f, 1.f} });
+	StateWeightsByCategory.Add(EShopCategory::Unfinished, FStateWeights{ {4.f, 2.f, 2.f} });
+	StateWeightsByCategory.Add(EShopCategory::Cafe, FStateWeights{ {6.f, 0.f, 0.f} });
 }
 
 void AMallGenerator::DrawGrid()
@@ -79,8 +89,24 @@ void AMallGenerator::DrawGrid()
 					FColor(255, 255, 255)   // Cafe        Ч белый
 				};
 
+				static const FColor MannequinColors[] = {
+					FColor::Green,
+					FColor::Yellow,
+					FColor::Red
+				};
+
 				const int32 ShopId = CellShopIds[GetIndex(X, Y)];
-				Color = CategoryColors[static_cast<int32>(Shops[ShopId].Category)];
+				FShopData Shop = Shops[ShopId];
+
+				if (bShowMannequins) {
+					Color = MannequinColors[static_cast<int32>(Shop.State)];
+				}
+				else {
+					
+					Color = CategoryColors[static_cast<int32>(Shop.Category)];
+				}
+
+				
 				break; } 
 			}
 
@@ -270,6 +296,32 @@ void AMallGenerator::Generate()
 		Shops[InnerShops[i]].Category = EShopCategory::Cafe;
 	}
 	UE_LOG(LogTemp, Warning, TEXT("Cafes: %d"), FMath::Min(CafeCount, InnerShops.Num()));
+
+	// „асть 6.ѕрисвоение магазинам состо€ни€ манекенов и тип двери
+	for (FShopData& Shop : Shops) {
+		const FStateWeights* Found = StateWeightsByCategory.Find(Shop.Category);
+		if (Found && Found->Weights.Num() > 0) {
+			// ограничение по номеру последнего состо€ни€ ActiveMannequins
+			const int32 Picked = FMath::Min(PickWeighted(Found->Weights), static_cast<int32>(EShopState::ActiveMannequins));
+			Shop.State = static_cast<EShopState>(Picked);
+		}
+		// ¬ыбор двери
+		if (Shop.Category == EShopCategory::Grocery || Shop.Category == EShopCategory::Cafe) {
+			Shop.DoorType = EDoorType::None;
+		}
+		else if (Rng.FRandRange(0, 1) < ManualDoorChance) {
+			if ((Shop.Size.Y >= MinWidthForDoubleDoor && Shop.DoorDir.X != 0) ||
+				(Shop.Size.X >= MinWidthForDoubleDoor && Shop.DoorDir.Y != 0)) {
+				Shop.DoorType = EDoorType::ManualDouble;
+			}
+			else {
+				Shop.DoorType = EDoorType::Manual;
+			}
+		}
+		else {
+			Shop.DoorType = EDoorType::Automatic;
+		}
+	}
 
 	BuildFloor();
 	UE_LOG(LogTemp, Warning, TEXT("Generate: %.1f ms"), (FPlatformTime::Seconds() - StartTime) * 1000.0);
