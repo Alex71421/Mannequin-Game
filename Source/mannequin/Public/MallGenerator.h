@@ -92,6 +92,10 @@ struct FShopData {
 	// true - магазин в серой зоне, иначе false
 	UPROPERTY(VisibleAnywhere)
 	bool bInner = false;
+
+	// true - является закрытым магазином на ключ, внутри темно
+	UPROPERTY(VisibleAnywhere)
+	bool bLocked = false;
 };
 
 // Место, где может начинаться витрина магазина
@@ -239,8 +243,12 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Mall|Shops", meta = (ClampMin = "0"))
 	int32 CafeCount = 3;
 
+	// Веса состояний манекенов
 	UPROPERTY(EditAnywhere, Category = "Mall|Shops")
 	TMap<EShopCategory, FStateWeights> StateWeightsByCategory;
+
+	UPROPERTY(EditAnywhere, Category = "Mall|Shops", meta = (ClampMin = "0"))
+	int32 LockedShopCount = 5;
 
 	UFUNCTION(CallInEditor, Category = "Mall")
 	void DrawGrid();

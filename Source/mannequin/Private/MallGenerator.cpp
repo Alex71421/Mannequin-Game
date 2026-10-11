@@ -91,12 +91,12 @@ void AMallGenerator::DrawGrid()
 
 				static const FColor MannequinColors[] = {
 					FColor::Green,
-					FColor::Yellow,
-					FColor::Red
+					FColor::Orange,
+					FColor::Red,
 				};
 
 				const int32 ShopId = CellShopIds[GetIndex(X, Y)];
-				FShopData Shop = Shops[ShopId];
+				const FShopData& Shop = Shops[ShopId];
 
 				if (bShowMannequins) {
 					Color = MannequinColors[static_cast<int32>(Shop.State)];
@@ -106,6 +106,9 @@ void AMallGenerator::DrawGrid()
 					Color = CategoryColors[static_cast<int32>(Shop.Category)];
 				}
 
+				if (Shop.bLocked) {
+					Color = FColor::White;
+				}
 				
 				break; } 
 			}
@@ -322,6 +325,20 @@ void AMallGenerator::Generate()
 			Shop.DoorType = EDoorType::Automatic;
 		}
 	}
+
+	// Часть 7. Назначение закрытых магазинов
+	TArray<int32> ShopIds;
+	for (int32 i = 0; i < Shops.Num(); ++i) {
+		if (Shops[i].Category != EShopCategory::Cafe && Shops[i].DoorType != EDoorType::None) {
+			ShopIds.Add(i);
+		}
+	}
+	ShuffleArray(ShopIds);
+	for (int32 i = 0; i < FMath::Min(LockedShopCount, ShopIds.Num()); ++i) {
+		Shops[ShopIds[i]].bLocked = true;
+	}
+	UE_LOG(LogTemp, Warning, TEXT("Locked: %d"), FMath::Min(LockedShopCount, ShopIds.Num()));
+
 
 	BuildFloor();
 	UE_LOG(LogTemp, Warning, TEXT("Generate: %.1f ms"), (FPlatformTime::Seconds() - StartTime) * 1000.0);
