@@ -229,6 +229,18 @@ public:
 	UPROPERTY(VisibleAnywhere, Category = "Mall|Result")
 	TArray<FShopData> Shops;
 
+	// Клетка коридора, где появляется игрок
+	UPROPERTY(VisibleAnywhere, Category = "Mall|Result")
+	FIntPoint SpawnCell = FIntPoint::ZeroValue;
+
+	// Клетка прохода у внешней стены, где выходная дверь
+	UPROPERTY(VisibleAnywhere, Category = "Mall|Result")
+	FIntPoint ExitCell = FIntPoint::ZeroValue;
+
+	// Направление от выхода наружу
+	UPROPERTY(VisibleAnywhere, Category = "Mall|Result")
+	FIntPoint ExitDir = FIntPoint::ZeroValue;
+
 	UPROPERTY(EditAnywhere, Category = "Mall|Shops", meta = (ClampMin = "1"))
 	int32 MinShopWidth = 2;
 
@@ -263,6 +275,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Mall|Shops", meta = (ClampMin = "0"))
 	int32 LockedShopCount = 5;
 
+	// Минимальная площадь закрытого магазина
+	UPROPERTY(EditAnywhere, Category = "Mall|Shops", meta = (ClampMin = "0"))
+	int32 MinLockedShopArea = 8;
+
 	UPROPERTY(EditAnywhere, Category = "Mall|Items", meta = (ClampMin = "0"))
 	int32 KeyLimit = 10;
 
@@ -292,7 +308,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Mall|Items", meta = (ClampMin = "0"))
 	int32 MaxCoffeeCount = 3;
 
-
+	// Ширина прохода к выходу в клетках
+	UPROPERTY(EditAnywhere, Category = "Mall|Level", meta = (ClampMin = "1"))
+	int32 ExitWidth = 3;
 
 	UFUNCTION(CallInEditor, Category = "Mall")
 	void DrawGrid();
@@ -310,6 +328,11 @@ private:
 	TArray<bool> Blocks;
 	// Массив всей карты, где каждый магазин имеет на сетке свою цифру - номер
 	TArray<int32> CellShopIds;
+	// Для каждой клетки — сколько шагов по коридорам до неё от точки появления.
+	// -1 — клетка не коридор или до неё не дойти
+	TArray<int32> CorridorDistance;
+	// Клетки основного кольцевого коридора в центре — те, что стали коридором на шаге зон
+	TArray<FIntPoint> MainCorridorCellsCentered;
 
 	// Список точек - центров тупиков.
 	TArray<FIntPoint> DeadEnds;
@@ -386,4 +409,7 @@ private:
 			Array.Swap(i, j);
 		}
 	}
+
+	// Записывает в CorridorDistance число шагов до каждой клетки коридораот клетки Start
+	void ComputeCorridorDistances(FIntPoint Start);
 };

@@ -120,6 +120,8 @@ void AMallGenerator::DrawGrid()
 
 void AMallGenerator::Generate()
 {
+	MainCorridorCellsCentered.Reset();
+
 	const double StartTime = FPlatformTime::Seconds();
 	GridWidth = ShapeBlocksX * BlockSize;
 	GridHeight = ShapeBlocksY * BlockSize;
@@ -207,6 +209,9 @@ void AMallGenerator::Generate()
 			}
 			else if (Distance <= MaxDistance) {
 				Cells[Index] = ECellType::Corridor;
+				if (Distance == ShopStripWidth + CorridorWidth / 2 + 1) {
+					MainCorridorCellsCentered.Add(FIntPoint(X, Y));
+				}
 			}
 		}
 	}
@@ -243,6 +248,27 @@ void AMallGenerator::Generate()
 		++SpurAttempts;
 	}
 	UE_LOG(LogTemp, Warning, TEXT("Spurs: %d / %d"), TotalSpurs, SpurCount);
+
+	// Точка спавна
+	SpawnCell = FIntPoint(-1, -1);
+	ShuffleArray(MainCorridorCellsCentered);
+
+	for (const FIntPoint& Cell : MainCorridorCellsCentered) {
+		if (Cells[GetIndex(Cell.X, Cell.Y)] == ECellType::Corridor) {
+			SpawnCell = Cell;
+			break;
+		}
+	}
+
+	if (SpawnCell == FIntPoint(-1, -1))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Spawn cell not found"));
+		CorridorDistance.Init(-1, GridWidth* GridHeight);
+	}
+	else
+	{
+		ComputeCorridorDistances(SpawnCell);
+	}
 
 	// генерация магазинов
 	TArray<FIntPoint>  FreeCells = GetAllCells(ECellType::ShopZone);
@@ -329,13 +355,15 @@ void AMallGenerator::Generate()
 	// Часть 7. Назначение закрытых магазинов
 	TArray<int32> ShopIds;
 	for (int32 i = 0; i < Shops.Num(); ++i) {
-		if (Shops[i].Category != EShopCategory::Cafe && Shops[i].DoorType != EDoorType::None) {
+		if (Shops[i].Category != EShopCategory::Cafe && Shops[i].DoorType != EDoorType::None &&
+			MinLockedShopArea <= Shops[i].Size.X * Shops[i].Size.Y) {
 			ShopIds.Add(i);
 		}
 	}
 	ShuffleArray(ShopIds);
 	for (int32 i = 0; i < FMath::Min(LockedShopCount, ShopIds.Num()); ++i) {
 		Shops[ShopIds[i]].bLocked = true;
+		Shops[ShopIds[i]].DoorType = EDoorType::ManualDouble;
 	}
 	UE_LOG(LogTemp, Warning, TEXT("Locked: %d"), FMath::Min(LockedShopCount, ShopIds.Num()));
 
@@ -440,6 +468,7 @@ void AMallGenerator::Generate()
 
 	UE_LOG(LogTemp, Warning, TEXT("Fuses: %d, Keys: %d, Flashlights: %d, Stamina: %d, Coffee: %d"),
 		FuseCount, KeyCount, FlashLightCount, BoostCount, CoffeeCount);
+	
 
 	BuildFloor();
 	UE_LOG(LogTemp, Warning, TEXT("Generate: %.1f ms"), (FPlatformTime::Seconds() - StartTime) * 1000.0);
@@ -1021,3 +1050,25 @@ bool AMallGenerator::TryPlaceShopAt(FIntPoint StartCell, FIntPoint ToCorridor) {
 	
 	return false;
 }
+
+// Функция заливки расстояния от конкретной клетки до каждой другой
+void AMallGenerator::ComputeCorridorDistances(FIntPoint Start) {
+	CorridorDistance.Init(-1, GridHeight * GridWidth);
+	CorridorDistance[GetIndex(Start.X, Start.Y)] = 0;
+
+	TArray<FIntPoint> Queue;
+	Queue.Add(Start);
+
+	for (int32 i = 0; i < Queue.Num(); ++i) {
+		FIntPoint Point = Queue[i];
+
+		for (int32 Dir = 0; Dir <= 3; ++Dir) {
+			FIntPoint Neighbor = GetNeighbor(Point, Dir);
+			if (IsCellType(Neighbor, ECellType::Corridor) && CorridorDistance[GetIndex(Neighbor.X, Neighbor.Y)] == -1) {
+				Queue.Add(Neighbor);
+				CorridorDistance[GetIndex(Neighbor.X, Neighbor.Y)] = CorridorDistance[GetIndex(Point.X, Point.Y)] + 1;
+			}
+		}
+	}
+}
+
