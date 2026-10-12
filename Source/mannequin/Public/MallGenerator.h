@@ -53,6 +53,16 @@ enum class EDoorType : uint8
 	None
 };
 
+UENUM()
+enum class EItemType : uint8
+{
+	Key,
+	Flashlight,
+	Fuse,
+	Stamina,
+	Coffee
+};
+
 // USTRUCT — своя структура Unreal, как FIntPoint, только с нашими полями.
 // Префикс F обязателен для структур. GENERATED_BODY нужен так же, как в классе.
 // UPROPERTY у полей позволяет редактору показывать их, а движку — сохранять
@@ -88,6 +98,9 @@ struct FShopData {
 
 	UPROPERTY(VisibleAnywhere)
 	EShopState State = EShopState::Safe;
+
+	UPROPERTY(VisibleAnywhere)
+	TArray<EItemType> Items;
 
 	// true - магазин в серой зоне, иначе false
 	UPROPERTY(VisibleAnywhere)
@@ -249,6 +262,37 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "Mall|Shops", meta = (ClampMin = "0"))
 	int32 LockedShopCount = 5;
+
+	UPROPERTY(EditAnywhere, Category = "Mall|Items", meta = (ClampMin = "0"))
+	int32 KeyLimit = 10;
+
+	// Шанс что ключ появится в магазине не из категории одежды, моды или спорта
+	UPROPERTY(EditAnywhere, Category = "Mall|Items", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float KeySpawnChance = 0.5f;
+
+	UPROPERTY(EditAnywhere, Category = "Mall|Items", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float FlashlightChance = 0.15f;
+
+	UPROPERTY(EditAnywhere, Category = "Mall|Items", meta = (ClampMin = "0"))
+	int32 MinFlashlights = 10;
+
+	UPROPERTY(EditAnywhere, Category = "Mall|Items", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float BoostChance = 0.25f;
+
+	// на сколько клеток площади одного магазина приходится один доп буст;
+	UPROPERTY(EditAnywhere, Category = "Mall|Items", meta = (ClampMin = "1"))
+	int32 BoostAreaPerItem = 12;
+
+	UPROPERTY(EditAnywhere, Category = "Mall|Items", meta = (ClampMin = "1"))
+	int32 MaxBoostsPerShop = 3;
+
+	UPROPERTY(EditAnywhere, Category = "Mall|Items", meta = (ClampMin = "0"))
+	int32 MinCoffeeCount = 1;
+
+	UPROPERTY(EditAnywhere, Category = "Mall|Items", meta = (ClampMin = "0"))
+	int32 MaxCoffeeCount = 3;
+
+
 
 	UFUNCTION(CallInEditor, Category = "Mall")
 	void DrawGrid();

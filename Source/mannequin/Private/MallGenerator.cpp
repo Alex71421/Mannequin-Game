@@ -339,6 +339,107 @@ void AMallGenerator::Generate()
 	}
 	UE_LOG(LogTemp, Warning, TEXT("Locked: %d"), FMath::Min(LockedShopCount, ShopIds.Num()));
 
+	// Часть 8. Расположение предохранителей и ключей
+	TArray<int32> OpenShopsIds;
+	int32 FuseCount = 0;
+	for (int32 i = 0; i < Shops.Num(); ++i) {
+		if (Shops[i].bLocked) {
+			Shops[i].Items.Add(EItemType::Fuse);
+			FuseCount++;
+		}
+		else {
+			OpenShopsIds.Add(i);
+		}
+	}
+	ShuffleArray(OpenShopsIds);
+	int32 KeyCount = 0;
+	for (int32 i = 0; i < OpenShopsIds.Num(); ++i) {
+		FShopData& Shop = Shops[OpenShopsIds[i]];
+		if (Shop.Category == EShopCategory::Sport || Shop.Category == EShopCategory::Luxury ||
+			Shop.Category == EShopCategory::Clothing) {
+			Shop.Items.Add(EItemType::Key);
+			KeyCount++;
+		}
+		else {
+			if (Rng.FRandRange(0, 1) < KeySpawnChance) {
+				Shop.Items.Add(EItemType::Key);
+				KeyCount++;
+			}
+		}
+		if (KeyCount >= KeyLimit) {
+			break;
+		}
+	}
+
+	// Создание списков магазинов по категориям
+	TArray<int32> FlashlightShops;
+	TArray<int32> BoostShops;
+	TArray<int32> CoffeeShops;
+	for (int32 i = 0; i < OpenShopsIds.Num(); ++i) {
+		FShopData& Shop = Shops[OpenShopsIds[i]];
+		if (Shop.Category == EShopCategory::Electronics || Shop.Category == EShopCategory::Unfinished ||
+			Shop.Category == EShopCategory::Games) {
+			FlashlightShops.Add(OpenShopsIds[i]);
+		}
+		if (Shop.Category == EShopCategory::Grocery || Shop.Category == EShopCategory::Sweets) {
+			BoostShops.Add(OpenShopsIds[i]);
+		}
+		if (Shop.Category == EShopCategory::Cafe) {
+			CoffeeShops.Add(OpenShopsIds[i]);
+		}
+	}
+
+	// Часть 9. Расположение фонарей;
+	ShuffleArray(FlashlightShops);
+	int32 FlashLightCount = 0;
+	for (int32 ShopId : FlashlightShops) {
+		FShopData& Shop = Shops[ShopId];
+		if (Rng.FRandRange(0, 1) < FlashlightChance) {
+			Shop.Items.Add(EItemType::Flashlight);
+			FlashLightCount++;
+		}
+	}
+
+	if (FlashLightCount < MinFlashlights) {
+		for (int32 ShopId : FlashlightShops) {
+			FShopData& Shop = Shops[ShopId];
+			if (!Shop.Items.Contains(EItemType::Flashlight)) {
+				Shop.Items.Add(EItemType::Flashlight);
+				FlashLightCount++;
+			}
+			if (FlashLightCount >= MinFlashlights) {
+				break;
+			}
+		}
+	}
+
+	// Часть 10. Расположение бустов;
+	ShuffleArray(BoostShops);
+	int32 BoostCount = 0;
+	for (int32 ShopId : BoostShops) {
+		FShopData& Shop = Shops[ShopId];
+		if (Rng.FRandRange(0, 1) < BoostChance) {
+			int32 NumberOfBoosts = FMath::Min(1 + (Shop.Size.X * Shop.Size.Y) / BoostAreaPerItem, MaxBoostsPerShop);
+			for (int32 i = 0; i < NumberOfBoosts; ++i) {
+				Shop.Items.Add(EItemType::Stamina);
+				BoostCount++;
+			}
+		}
+	}
+
+	// Часть 11. Расположение кофе;
+	int32 CoffeeCount = 0;
+	for (int32 ShopId : CoffeeShops) {
+		FShopData& Shop = Shops[ShopId];
+		int32 NumberOfCoffee = Rng.RandRange(MinCoffeeCount, MaxCoffeeCount);
+		for (int32 i = 0; i < NumberOfCoffee; ++i) {
+			Shop.Items.Add(EItemType::Coffee);
+			CoffeeCount++;
+		}
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("Fuses: %d, Keys: %d, Flashlights: %d, Stamina: %d, Coffee: %d"),
+		FuseCount, KeyCount, FlashLightCount, BoostCount, CoffeeCount);
 
 	BuildFloor();
 	UE_LOG(LogTemp, Warning, TEXT("Generate: %.1f ms"), (FPlatformTime::Seconds() - StartTime) * 1000.0);
